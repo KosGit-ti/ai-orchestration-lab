@@ -26,7 +26,7 @@ uv run ruff check .
 uv run ruff format --check .
 
 # 型チェック
-uv run mypy src/ tests/
+uv run mypy src/ tests/ ci/
 
 # テスト
 uv run pytest -q --tb=short
