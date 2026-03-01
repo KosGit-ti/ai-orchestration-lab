@@ -1,0 +1,108 @@
+# =============================================================================
+# プロジェクト設定ファイル — AI Orchestration Lab
+# =============================================================================
+
+# --- プロジェクト基本情報 ---
+project:
+  name: "ai-orchestration-lab"
+  display_name: "AI Orchestration Lab"
+  description: "AI エージェントオーケストレーションの研究・検証・実装ラボ"
+  purpose: |
+    dev-orchestration-template のオーケストレーション設計を進化させるための
+    研究・実験・検証リポジトリ。成果は dev-orchestration-template や
+    他のプロジェクトリポジトリに段階的にフィードバックする。
+  scope_in: |
+    - エージェント並列実行の研究・実装・検証
+    - 型安全オーケストレーション（LangGraph + Pydantic AI）の研究
+    - パイプライン品質評価（Eval フレームワーク）の研究
+    - A2A プロトコルの実装検証
+    - AI Gateway（LiteLLM 等）の統合検証
+    - TDD 並列フローの研究
+    - 成果の dev-orchestration-template へのフィードバック
+  scope_out: |
+    - 本番プロダクトの開発
+    - 既存プロジェクト固有のビジネスロジック
+    - 外部 API の本番接続
+  owner: "KosGit-ti"
+
+# --- 言語・ツールチェイン ---
+toolchain:
+  language: "python"
+  version: "3.11"
+  package_manager: "uv"
+  linter: "ruff check ."
+  formatter: "ruff format --check ."
+  type_checker: "mypy src/ tests/"
+  test_runner: "pytest -q --tb=short"
+  run_prefix: "uv run"
+
+# --- ソースコード構成 ---
+source:
+  src_dir: "src"
+  package_name: "orchestration_lab"
+  modules:
+    - name: "core"
+      description: "型定義、例外、共通ユーティリティ"
+    - name: "parallel"
+      description: "エージェント並列実行フレームワーク"
+    - name: "eval"
+      description: "パイプライン品質評価フレームワーク"
+
+# --- ロードマップ ---
+roadmap:
+  phases:
+    - id: 0
+      name: "Foundation"
+      goal: "リポジトリ基盤整備、CI 品質ゲート確立"
+      duration: "1 週間"
+    - id: 1
+      name: "Parallel Execution"
+      goal: "エージェント並列実行の研究・実装・検証"
+      duration: "2〜4 週間"
+    - id: 2
+      name: "Typed Orchestration"
+      goal: "LangGraph + Pydantic AI による型安全オーケストレーション"
+      duration: "2〜4 週間"
+    - id: 3
+      name: "Eval & Observability"
+      goal: "パイプライン品質評価・AI Gateway 統合"
+      duration: "2〜3 週間"
+    - id: 4
+      name: "A2A & Advanced"
+      goal: "A2A プロトコル実装、高度な研究"
+      duration: "継続"
+
+# --- ポリシー ---
+policies:
+  forbidden_imports: []
+  forbidden_patterns: []
+  custom: []
+
+# --- GitHub 設定 ---
+github:
+  labels:
+    - { name: "research", color: "6f42c1", description: "研究・調査" }
+    - { name: "experiment", color: "0075ca", description: "実験・検証" }
+    - { name: "implementation", color: "e4e669", description: "実装" }
+    - { name: "feedback", color: "d73a4a", description: "テンプレートへのフィードバック" }
+    - { name: "phase:0", color: "c5def5", description: "Phase 0: Foundation" }
+    - { name: "phase:1", color: "bfd4f2", description: "Phase 1: Parallel Execution" }
+    - { name: "phase:2", color: "b4c7e7", description: "Phase 2: Typed Orchestration" }
+    - { name: "phase:3", color: "a8b8d9", description: "Phase 3: Eval & Observability" }
+    - { name: "phase:4", color: "9caacb", description: "Phase 4: A2A & Advanced" }
+    - { name: "priority:high", color: "b60205", description: "高優先度" }
+    - { name: "priority:medium", color: "fbca04", description: "中優先度" }
+    - { name: "priority:low", color: "0e8a16", description: "低優先度" }
+  project_name: "AI Orchestration Lab ロードマップ"
+
+# --- AI モデル設定 ---
+ai_models:
+  default: "Claude Opus 4.6 (copilot)"
+  overrides:
+    orchestrator: "Claude Opus 4.6 (copilot)"
+    implementer: "Claude Sonnet 4.6 (copilot)"
+    test_engineer: "Claude Sonnet 4.6 (copilot)"
+    auditor_spec: "Claude Sonnet 4.6 (copilot)"
+    auditor_security: "Claude Sonnet 4.6 (copilot)"
+    auditor_reliability: "Claude Sonnet 4.6 (copilot)"
+    release_manager: "Claude Opus 4.6 (copilot)"

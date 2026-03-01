@@ -1,0 +1,15 @@
+# AI モデル設定
+# エージェントパイプラインで使用する AI モデルの設定正本。
+# 変更後に scripts/update_agent_models.sh を実行すると各エージェントファイルに反映される。
+
+[default]
+model = "Claude Opus 4.6 (copilot)"
+
+[overrides]
+orchestrator = "Claude Opus 4.6 (copilot)"
+implementer = "Claude Sonnet 4.6 (copilot)"
+test_engineer = "Claude Sonnet 4.6 (copilot)"
+auditor_spec = "Claude Sonnet 4.6 (copilot)"
+auditor_security = "Claude Sonnet 4.6 (copilot)"
+auditor_reliability = "Claude Sonnet 4.6 (copilot)"
+release_manager = "Claude Opus 4.6 (copilot)"
