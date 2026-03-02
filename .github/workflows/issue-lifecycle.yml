@@ -35,15 +35,18 @@ jobs:
           echo "=== PR #${PR_NUMBER} merged ==="
 
           # PR 本文から Closes/Resolves/Fixes #XX を抽出
-          ISSUES=$(echo "$PR_BODY" | grep -oiE '(close[sd]?|resolve[sd]?|fix(e[sd])?)\s+#[0-9]+' | grep -oE '#[0-9]+' | tr -d '#' | sort -un)
+          # grep が非一致で exit 1 になるのを許容する（|| true）
+          ISSUES=$(echo "$PR_BODY" | grep -oiE '(close[sd]?|resolve[sd]?|fix(e[sd])?)\s+#[0-9]+' | grep -oE '#[0-9]+' | tr -d '#' | sort -un || true)
 
           if [ -z "$ISSUES" ]; then
             echo "PR 本文に Closes/Resolves/Fixes #XX が見つかりません。スキップします。"
             echo "issues=" >> "$GITHUB_OUTPUT"
             echo "has_issues=false" >> "$GITHUB_OUTPUT"
           else
-            echo "対象 Issue: $ISSUES"
-            echo "issues=$ISSUES" >> "$GITHUB_OUTPUT"
+            # GitHub Actions の出力形式を壊さないよう、改行区切りをスペース区切り 1 行に正規化
+            ISSUES_ONELINE=$(echo "$ISSUES" | tr '\n' ' ')
+            echo "対象 Issue: $ISSUES_ONELINE"
+            echo "issues=$ISSUES_ONELINE" >> "$GITHUB_OUTPUT"
             echo "has_issues=true" >> "$GITHUB_OUTPUT"
           fi
 
