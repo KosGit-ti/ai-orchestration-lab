@@ -10,7 +10,8 @@
 3. [パイプラインフロー](#3-パイプラインフロー)
 4. [エージェント応答スキーマ](#4-エージェント応答スキーマ)
 5. [研究テーマ別の設計進化](#5-研究テーマ別の設計進化)
-6. [変更履歴](#6-変更履歴)
+6. [Copilot コードレビュー統合](#6-copilot-コードレビュー統合)
+7. [変更履歴](#7-変更履歴)
 
 ---
 
@@ -161,8 +162,72 @@ A2A プロトコルによるエージェント間通信の標準化。
 
 ---
 
-## 6. 変更履歴
+## 6. Copilot コードレビュー統合
+
+### 6.1 概要
+
+GitHub Copilot Code Review は **PR 作成時に自動トリガーされる初回レビューのみ** を対象とする。
+修正 push 後の再レビュー依頼は API 制限により自動化不可能であるため、
+**静的解析（CI + get_errors）の通過をもって品質ゲート** とする。
+
+### 6.2 技術的背景（API 制限）
+
+API 経由での Copilot 再レビュー依頼は以下のすべてが失敗する（2025-07 検証済み）：
+
+| 方法 | 結果 |
+|---|---|
+| REST API `POST /requested_reviewers` | Bot に対しては `requested_reviewers: []`（無視） |
+| GraphQL `requestReviews` | Bot ノード ID を User として解決できない |
+| dismiss → 再リクエスト | COMMENTED レビューは dismiss 不可（422 エラー） |
+
+唯一の再レビュー手段は GitHub GUI の「Re-request review」ボタンのみ。
+
+### 6.3 設計原則
+
+| # | 原則 | 説明 |
+|---|---|---|
+| 1 | 初回レビューのみ | PR 作成時の自動トリガーによる初回レビューのみを対象 |
+| 2 | 静的解析が品質ゲート | 修正 push 後は CI + get_errors 通過をもって品質を担保する |
+| 3 | Bounded Recursion | 初回レビュー指摘への対応は最大3回のイテレーションで制限 |
+| 4 | 静的解析ファースト | AI レビューの前に CI + get_errors を必ず通過させる |
+
+### 6.4 レビュー対応フロー
+
+```mermaid
+flowchart TD
+    Start([PR 作成]) --> WaitCI[CI 通過を確認]
+    WaitCI --> WaitReview[初回 Copilot レビュー到着待機<br/>最大20分（60秒×最大20回）ポーリング]
+    WaitReview --> Stable[コメント安定化フェーズ<br/>15秒×最大8回]
+    Stable --> GetComments[レビューコメント取得]
+    GetComments --> Classify{Must/Should 指摘?}
+    Classify -->|あり| Fix[implementer に修正委譲]
+    Fix --> Reply[コメント返信<br/>※コード変更なし]
+    Reply --> FinalCI[ローカル CI 再実行<br/>コミット直前ゲート]
+    FinalCI --> IDECheck{get_errors<br/>エラーゼロ?}
+    IDECheck -->|エラーあり| Fix
+    IDECheck -->|エラーゼロ| Commit[コミット]
+    Commit --> CleanCheck{git status --porcelain<br/>出力が空?}
+    CleanCheck -->|No| FinalCI
+    CleanCheck -->|Yes| Push[プッシュ<br/>再レビュー依頼なし]
+    Push --> Inc{iteration < 3?}
+    Inc -->|Yes & 未解決あり| Fix
+    Inc -->|No| Escalate[人間にエスカレーション]
+    Classify -->|なし / approve| Done([ループ終了])
+```
+
+### 6.5 指摘の分類
+
+| 分類 | 対応 |
+|---|---|
+| **Must** | マージ前に修正必須 |
+| **Should** | 強く推奨（時間が許せば修正） |
+| **Nice** | 今回はスキップ可 |
+
+---
+
+## 7. 変更履歴
 
 | 日付 | 内容 |
 |---|---|
+| 2026-03-02 | §6 Copilot コードレビュー統合セクションを新設。レビュー到着待機フロー（20分×ポーリング）を記載。 |
 | 2026-03-01 | dev-orchestration-template ベースで初版作成。 |
