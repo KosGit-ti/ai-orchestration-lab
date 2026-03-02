@@ -64,3 +64,4 @@ mypy_path = "src"
 testpaths = ["tests"]
 pythonpath = ["src"]
 asyncio_mode = "auto"
+filterwarnings = ["ignore:Core Pydantic V1:UserWarning"]
