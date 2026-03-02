@@ -183,10 +183,10 @@ async def mock_commander_review(
 
     feedback: dict[str, str] = {}
     for r in results:
-        if r.quality_score < threshold:
-            feedback[r.task_id] = f"品質スコア {r.quality_score:.2f} が閾値 {threshold} 未満"
-        elif not r.success:
+        if not r.success:
             feedback[r.task_id] = "実行に失敗。再試行が必要"
+        elif r.quality_score < threshold:
+            feedback[r.task_id] = f"品質スコア {r.quality_score:.2f} が閾値 {threshold} 未満"
 
     passed = overall >= threshold and all(r.success for r in results)
 
@@ -220,12 +220,12 @@ async def run_fanout_fanin(task_description: str) -> PipelineResult:
     pipeline_start = time.monotonic()
     all_results: list[SubTaskResult] = []
 
-    print(f"\n{'=' * 60}")
-    print("Fan-Out/Fan-In パイプライン開始")
+    print(f"\n{'='*60}")
+    print(f"Fan-Out/Fan-In パイプライン開始")
     print(f"タスク: {task_description}")
     print(f"設定: ワーカー数={NUM_WORKERS}, 品質閾値={QUALITY_THRESHOLD}")
     print(f"       最大イテレーション={MAX_ITERATIONS}")
-    print(f"{'=' * 60}")
+    print(f"{'='*60}")
 
     for iteration in range(MAX_ITERATIONS):
         print(f"\n--- イテレーション {iteration + 1}/{MAX_ITERATIONS} ---")
@@ -256,20 +256,20 @@ async def run_fanout_fanin(task_description: str) -> PipelineResult:
             )
 
         # Step 3: Fan-In + Quality Gate
-        print("\n  [Commander] 品質レビュー中...")
+        print(f"\n  [Commander] 品質レビュー中...")
         verdict = await mock_commander_review(results, QUALITY_THRESHOLD)
 
         if verdict.passed:
             total_duration = time.monotonic() - pipeline_start
-            print(f"\n{'=' * 60}")
-            print("パイプライン完了！")
+            print(f"\n{'='*60}")
+            print(f"パイプライン完了！")
             print(f"  イテレーション数: {iteration + 1}")
             print(f"  最終品質スコア: {verdict.overall_score:.2f}")
             print(f"  総所要時間: {total_duration:.2f}秒")
             total_input = sum(r.input_tokens for r in all_results)
             total_output = sum(r.output_tokens for r in all_results)
             print(f"  総トークン: 入力={total_input}, 出力={total_output}")
-            print(f"{'=' * 60}\n")
+            print(f"{'='*60}\n")
 
             return PipelineResult(
                 success=True,
@@ -279,7 +279,7 @@ async def run_fanout_fanin(task_description: str) -> PipelineResult:
                 final_score=verdict.overall_score,
             )
 
-        print("  [Commander] 品質基準未達。再指示してイテレーション継続...")
+        print(f"  [Commander] 品質基準未達。再指示してイテレーション継続...")
 
     # 最大イテレーション到達
     total_duration = time.monotonic() - pipeline_start
@@ -287,11 +287,11 @@ async def run_fanout_fanin(task_description: str) -> PipelineResult:
         sum(r.quality_score for r in all_results) / len(all_results) if all_results else 0.0
     )
 
-    print(f"\n{'=' * 60}")
-    print("パイプライン終了（最大イテレーション到達）")
+    print(f"\n{'='*60}")
+    print(f"パイプライン終了（最大イテレーション到達）")
     print(f"  最終品質スコア: {final_score:.2f}")
     print(f"  総所要時間: {total_duration:.2f}秒")
-    print(f"{'=' * 60}\n")
+    print(f"{'='*60}\n")
 
     return PipelineResult(
         success=False,
@@ -320,16 +320,16 @@ async def run_sequential(task_description: str) -> PipelineResult:
     """
     pipeline_start = time.monotonic()
 
-    print(f"\n{'=' * 60}")
-    print("逐次実行パイプライン開始（ベースライン比較）")
-    print(f"{'=' * 60}")
+    print(f"\n{'='*60}")
+    print(f"逐次実行パイプライン開始（ベースライン比較）")
+    print(f"{'='*60}")
 
     subtasks = await mock_commander_decompose(task_description)
     all_results: list[SubTaskResult] = []
 
     for i, subtask in enumerate(subtasks):
         print(f"\n  [Sequential] サブタスク {i + 1}/{len(subtasks)}: {subtask.task_id}")
-        result = await mock_worker_execute(f"worker-seq-{i:03d}", subtask, iteration=1)
+        result = await mock_worker_execute(f"worker-seq-{i:03d}", subtask, iteration=0)
         all_results.append(result)
 
     total_duration = time.monotonic() - pipeline_start
@@ -387,26 +387,30 @@ async def main() -> None:
     sequential_result = await run_sequential(task)
 
     # 比較結果
-    print(f"\n{'=' * 60}")
+    print(f"\n{'='*60}")
     print("比較結果")
-    print(f"{'=' * 60}")
+    print(f"{'='*60}")
     print(f"{'指標':<20} {'並列実行':>12} {'逐次実行':>12} {'改善率':>10}")
-    print(f"{'-' * 54}")
+    print(f"{'-'*54}")
+    improvement_rate = _calc_improvement_rate(
+        parallel_result.total_duration,
+        sequential_result.total_duration,
+    )
+    score_diff = _calc_score_diff(
+        parallel_result.final_score,
+        sequential_result.final_score,
+    )
     print(
         f"{'所要時間（秒）':<20}"
         f" {parallel_result.total_duration:>12.2f}"
         f" {sequential_result.total_duration:>12.2f}"
-        f" {
-            _calc_improvement_rate(
-                parallel_result.total_duration,
-                sequential_result.total_duration,
-            ):>9.1f}%"
+        f" {improvement_rate:>9.1f}%"
     )
     print(
         f"{'品質スコア':<20}"
         f" {parallel_result.final_score:>12.2f}"
         f" {sequential_result.final_score:>12.2f}"
-        f" {_calc_score_diff(parallel_result.final_score, sequential_result.final_score):>9.1f}%"
+        f" {score_diff:>9.1f}%"
     )
     print(
         f"{'イテレーション数':<20}"
@@ -420,7 +424,7 @@ async def main() -> None:
         f" {'Yes' if sequential_result.success else 'No':>12}"
         f" {'N/A':>10}"
     )
-    print(f"{'=' * 60}\n")
+    print(f"{'='*60}\n")
 
 
 if __name__ == "__main__":
