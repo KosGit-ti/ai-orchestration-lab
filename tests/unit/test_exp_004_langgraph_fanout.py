@@ -292,6 +292,9 @@ class TestCommanderNode:
         assert "subtasks" in result
         assert len(result["subtasks"]) == 5
         assert result["iteration"] == 1
+        # all_subtasks が同一リストで設定されること（Fan-Out 後も保護）
+        assert "all_subtasks" in result
+        assert len(result["all_subtasks"]) == 5
 
 
 class TestWorkerNode:
@@ -389,6 +392,7 @@ class TestPrepareRetryNode:
         state: dict[str, Any] = {
             "task_description": "テスト",
             "subtasks": [st1, st2],
+            "all_subtasks": [st1, st2],
             "worker_results": [],
             "quality_result": qr,
             "iteration": 1,
@@ -400,6 +404,35 @@ class TestPrepareRetryNode:
         assert result["subtasks"][0].task_id == "t2"
         assert result["subtasks"][0].retry_feedback == "改善を求む"
         assert result["iteration"] == 2
+        # all_subtasks も更新されること
+        assert result["all_subtasks"] == result["subtasks"]
+
+    def test_uses_all_subtasks_when_subtasks_corrupted(self) -> None:
+        """subtasks が Fan-Out で上書きされても all_subtasks から正しく再指示すること。"""
+        st1 = SubTask(task_id="t1", description="テスト1", assigned_model="m")
+        st2 = SubTask(task_id="t2", description="テスト2", assigned_model="m")
+        qr = QualityGateResult(
+            passed=False,
+            overall_score=0.5,
+            failed_task_ids=["t2"],
+            task_feedback={"t2": "品質不合格"},
+        )
+        state: dict[str, Any] = {
+            "task_description": "テスト",
+            # subtasks が Fan-Out 経由で最後のワーカー分 1 件に上書きされた想定
+            "subtasks": [st1],
+            # all_subtasks は全タスクを保持
+            "all_subtasks": [st1, st2],
+            "worker_results": [],
+            "quality_result": qr,
+            "iteration": 1,
+            "max_iterations": 3,
+            "quality_threshold": 0.8,
+        }
+        result = prepare_retry_node(state)
+        # subtasks には st2 がなくても all_subtasks から正しく再指示される
+        assert len(result["subtasks"]) == 1
+        assert result["subtasks"][0].task_id == "t2"
 
 
 # ============================================================

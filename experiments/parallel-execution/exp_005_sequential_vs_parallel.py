@@ -26,12 +26,9 @@ import statistics
 import sys
 import time
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
-# Pydantic v1 互換警告を抑制（Python 3.14 環境）
-warnings.filterwarnings("ignore", message="Core Pydantic V1")
 
 # 実験ディレクトリはハイフン含みのため、sys.path 経由でインポートする
 
@@ -61,22 +58,6 @@ SEED_BASE = 100  # シードの基準値
 # ============================================================
 # 逐次実行パイプライン
 # ============================================================
-
-
-@dataclass
-class SequentialResult:
-    """逐次実行の結果。"""
-
-    status: str
-    iterations: int
-    total_duration_seconds: float
-    quality_score: float
-    quality_passed: bool
-    worker_count: int
-    total_input_tokens: int
-    total_output_tokens: int
-    total_tokens: int
-    worker_results: list[WorkerOutput] = field(default_factory=list)
 
 
 def run_sequential_pipeline(
@@ -409,4 +390,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Pydantic v1 互換警告を抑制（CLI 実行時のみ。テスト環境は pyproject.toml で制御）
+    import warnings
+
+    warnings.filterwarnings("ignore", message="Core Pydantic V1")
     main()

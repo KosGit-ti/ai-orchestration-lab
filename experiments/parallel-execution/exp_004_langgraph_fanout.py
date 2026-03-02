@@ -27,15 +27,11 @@ import random
 import time
 import warnings
 from dataclasses import dataclass, field
-from typing import Annotated, Any, TypedDict
+from typing import Annotated, Any, NotRequired, TypedDict
 
 from langgraph.graph import END
 from langgraph.graph.state import StateGraph
 from langgraph.types import Send
-
-# Pydantic v1 互換警告を抑制（Python 3.14 環境）
-warnings.filterwarnings("ignore", message="Core Pydantic V1")
-
 
 # ============================================================
 # 型定義（実験用ローカル型）
@@ -88,10 +84,15 @@ class PipelineState(TypedDict):
 
     worker_results は Annotated + operator.add で
     各ワーカーノードからの結果を自動的にリストに集約する。
+
+    all_subtasks は Fan-Out 後も保持される完全なサブタスクリスト。
+    Send に渡すワーカー状態には含めないことで、ワーカーの状態マージ後も
+    prepare_retry_node が正しく全サブタスクを参照できる。
     """
 
     task_description: str
     subtasks: list[SubTask]
+    all_subtasks: NotRequired[list[SubTask]]
     worker_results: Annotated[list[WorkerOutput], operator.add]
     quality_result: QualityGateResult | None
     iteration: int
@@ -190,7 +191,7 @@ def commander_node(state: PipelineState) -> dict[str, Any]:
     """司令塔ノード: タスクを分解する。"""
     subtasks = mock_decompose(state["task_description"])
     print(f"  [Commander] タスクを {len(subtasks)} 個のサブタスクに分解")
-    return {"subtasks": subtasks, "iteration": 1}
+    return {"subtasks": subtasks, "all_subtasks": subtasks, "iteration": 1}
 
 
 def worker_node(state: PipelineState) -> dict[str, Any]:
@@ -237,12 +238,18 @@ def quality_gate_node(state: PipelineState) -> dict[str, Any]:
 
 
 def prepare_retry_node(state: PipelineState) -> dict[str, Any]:
-    """再指示準備ノード: 不合格タスクにフィードバックを付与する。"""
+    """再指示準備ノード: 不合格タスクにフィードバックを付与する。
+
+    all_subtasks を優先して参照することで、Fan-Out 後に subtasks が
+    ワーカー単位の 1 件に上書きされた場合でも正しく全タスクを走査できる。
+    """
     quality = state["quality_result"]
     if quality is None:
-        return {"subtasks": [], "iteration": state.get("iteration", 1) + 1}
+        return {"subtasks": [], "all_subtasks": [], "iteration": state.get("iteration", 1) + 1}
 
-    original_subtasks = state["subtasks"]
+    # all_subtasks を優先（Fan-Out で subtasks が上書きされる場合への保護）
+    _all = state.get("all_subtasks")
+    original_subtasks = _all if _all is not None else state["subtasks"]
     failed_ids = set(quality.failed_task_ids)
 
     retry_subtasks: list[SubTask] = []
@@ -263,6 +270,7 @@ def prepare_retry_node(state: PipelineState) -> dict[str, Any]:
     print(f"  [Retry] {len(retry_subtasks)} タスクを再指示 (iter→{new_iter})")
     return {
         "subtasks": retry_subtasks,
+        "all_subtasks": retry_subtasks,
         "iteration": new_iter,
     }
 
@@ -478,4 +486,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Pydantic v1 互換警告を抑制（CLI 実行時のみ。テスト環境は pyproject.toml で制御）
+    import warnings
+
+    warnings.filterwarnings("ignore", message="Core Pydantic V1")
     main()
